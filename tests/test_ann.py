@@ -94,3 +94,88 @@ class TestGradients:
 
         net._backward = wrong_backward
         assert gradient_check(net, X, y) > 1e-2
+
+
+def blobs(n_per_class=30, seed=0):
+    rng = np.random.default_rng(seed)
+    X = np.vstack([rng.normal(-2.0, 1.0, size=(n_per_class, 2)), rng.normal(2.0, 1.0, size=(n_per_class, 2))])
+    y = np.array([0] * n_per_class + [1] * n_per_class)
+    return X, y
+
+
+def xor_problem(n=200, seed=0):
+    rng = np.random.default_rng(seed)
+    X = rng.uniform(-1.0, 1.0, size=(n, 2))
+    y = ((X[:, 0] * X[:, 1]) > 0).astype(int)
+    return X, y
+
+
+class TestTraining:
+    def test_fit_returns_self_and_records_decreasing_loss(self):
+        X, y = blobs()
+        net = NeuralNetwork(hidden_layers=(), learning_rate=0.5, epochs=50, seed=0)
+        assert net.fit(X, y) is net
+        assert len(net.loss_history_) == 50
+        assert net.loss_history_[-1] < net.loss_history_[0]
+
+    def test_separable_blobs_are_learned_perfectly(self):
+        X, y = blobs()
+        net = NeuralNetwork(hidden_layers=(), learning_rate=0.5, epochs=100, seed=0).fit(X, y)
+        assert (net.predict(X) == y).mean() == 1.0
+
+    def test_hidden_layer_solves_xor_but_logistic_regression_cannot(self):
+        X, y = xor_problem()
+        linear = NeuralNetwork(hidden_layers=(), learning_rate=0.5, epochs=200, seed=0).fit(X, y)
+        mlp = NeuralNetwork(hidden_layers=(16,), activation="tanh", learning_rate=0.5, epochs=300,
+                            batch_size=16, seed=0).fit(X, y)
+        assert (linear.predict(X) == y).mean() < 0.75
+        assert (mlp.predict(X) == y).mean() >= 0.95
+
+    def test_predict_proba_shape_range_and_threshold(self):
+        X, y = blobs()
+        net = NeuralNetwork(hidden_layers=(4,), epochs=5).fit(X, y)
+        p = net.predict_proba(X)
+        assert p.shape == (len(X),) and ((p >= 0) & (p <= 1)).all()
+        assert set(np.unique(net.predict(X))) <= {0, 1}
+        assert net.predict(X, threshold=1.01).sum() == 0
+
+    def test_accepts_float32_features_and_int_labels(self):
+        X, y = blobs()
+        net = NeuralNetwork(hidden_layers=(4,), epochs=3).fit(X.astype(np.float32), y.astype(np.int64))
+        assert net.predict(X.astype(np.float32)).shape == (len(X),)
+
+    def test_same_seed_same_model_different_seed_different_model(self):
+        X, y = blobs()
+        a = NeuralNetwork(hidden_layers=(4,), epochs=3, seed=1).fit(X, y)
+        b = NeuralNetwork(hidden_layers=(4,), epochs=3, seed=1).fit(X, y)
+        c = NeuralNetwork(hidden_layers=(4,), epochs=3, seed=2).fit(X, y)
+        for Wa, Wb in zip(a.weights_, b.weights_):
+            np.testing.assert_array_equal(Wa, Wb)
+        assert any(not np.array_equal(Wa, Wc) for Wa, Wc in zip(a.weights_, c.weights_))
+
+    def test_balanced_class_weight_raises_recall_on_imbalanced_data(self):
+        rng = np.random.default_rng(0)
+        X = np.vstack([rng.normal(0.0, 1.0, size=(190, 2)), rng.normal(1.5, 1.0, size=(10, 2))])
+        y = np.array([0] * 190 + [1] * 10)
+        plain = NeuralNetwork(hidden_layers=(), learning_rate=0.3, epochs=30, seed=0).fit(X, y)
+        balanced = NeuralNetwork(hidden_layers=(), learning_rate=0.3, epochs=30, seed=0,
+                                 class_weight="balanced").fit(X, y)
+        assert balanced.predict(X)[y == 1].mean() > plain.predict(X)[y == 1].mean()
+
+    def test_input_validation(self):
+        X, y = blobs()
+        with pytest.raises(ValueError):
+            NeuralNetwork().fit(X, np.where(y == 1, 2, 0))       # labels must be 0/1
+        with pytest.raises(ValueError):
+            NeuralNetwork().fit(X[:10], y)                        # length mismatch
+        with pytest.raises(ValueError):
+            NeuralNetwork().fit(X.ravel(), y)                     # X must be 2-D
+        with pytest.raises(RuntimeError):
+            NeuralNetwork().predict(X)                            # not fitted
+        net = NeuralNetwork(epochs=1).fit(X, y)
+        with pytest.raises(ValueError):
+            net.predict(X[:, :1])                                 # wrong number of features
+
+    def test_n_parameters(self):
+        net = NeuralNetwork(hidden_layers=(5, 3)).fit(*blobs())
+        assert net.n_parameters_ == (2 * 5 + 5) + (5 * 3 + 3) + (3 * 1 + 1)

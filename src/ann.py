@@ -131,6 +131,57 @@ class NeuralNetwork:
                 delta = (delta @ self.weights_[layer].T) * self._activate_grad(pre_activations[layer - 1], activations[layer])
         return grads_W, grads_b
 
+    # ------------------------------------------------------------------ public API
+    def fit(self, X, y) -> "NeuralNetwork":
+        """Mini-batch SGD on the (weighted) cross-entropy. Records the full-data loss per epoch."""
+        X = np.asarray(X, dtype=np.float64)
+        y = np.asarray(y).ravel()
+        if X.ndim != 2:
+            raise ValueError("X must be 2-dimensional (n_samples, n_features)")
+        if len(X) != len(y):
+            raise ValueError(f"X has {len(X)} rows but y has {len(y)} labels")
+        if not np.isin(y, (0, 1)).all():
+            raise ValueError("y must contain only 0 and 1")
+        y = y.astype(np.float64)
+        rng = self._init_weights(X.shape[1])
+        sample_weight = self._sample_weights(y)
+        self.loss_history_ = []
+        n = len(y)
+        for epoch in range(self.epochs):
+            order = rng.permutation(n)
+            for start in range(0, n, self.batch_size):
+                idx = order[start:start + self.batch_size]
+                activations, pre_activations = self._forward(X[idx])
+                grads_W, grads_b = self._backward(activations, pre_activations, y[idx], sample_weight[idx])
+                for layer in range(len(self.weights_)):
+                    self.weights_[layer] -= self.learning_rate * grads_W[layer]
+                    self.biases_[layer] -= self.learning_rate * grads_b[layer]
+            self.loss_history_.append(self._loss(X, y, sample_weight))
+            if self.verbose:
+                print(f"epoch {epoch + 1:3d}/{self.epochs}  loss = {self.loss_history_[-1]:.4f}")
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def _check_fitted(self) -> None:
+        if not hasattr(self, "n_features_in_"):
+            raise RuntimeError("call fit(X, y) before predicting")
+
+    def predict_proba(self, X) -> np.ndarray:
+        """P(spam) for every row, shape (n,)."""
+        self._check_fitted()
+        X = np.asarray(X, dtype=np.float64)
+        if X.ndim != 2 or X.shape[1] != self.n_features_in_:
+            raise ValueError(f"expected shape (n, {self.n_features_in_}), got {X.shape}")
+        return self._forward(X)[0][-1].ravel()
+
+    def predict(self, X, threshold: float = 0.5) -> np.ndarray:
+        """1 (spam) where P(spam) >= threshold, else 0."""
+        return (self.predict_proba(X) >= threshold).astype(int)
+
+    @property
+    def n_parameters_(self) -> int:
+        return int(sum(W.size for W in self.weights_) + sum(b.size for b in self.biases_))
+
 
 def gradient_check(model: NeuralNetwork, X, y, eps: float = 1e-5) -> float:
     """Compare back-propagation with central finite differences on every single parameter.

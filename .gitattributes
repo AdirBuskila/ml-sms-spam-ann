@@ -3,3 +3,5 @@
 *.ipynb text eol=lf
 *.pdf binary
 *.png binary
+# Raw Kaggle files must stay byte-identical to the download (CRLF included)
+data/raw/*.csv -text

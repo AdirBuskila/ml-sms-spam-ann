@@ -7,6 +7,8 @@
 **Repo (source of truth):** `C:\Users\Adir\dev\ml-sms-spam-ann` -> https://github.com/AdirBuskila/ml-sms-spam-ann
 **🔥 DEADLINE: 10 September 2026**
 
+> **Status 2026-09-01:** code + tests + executed notebook are done and pushed. Winner `mlp32 / +extra`, CV F1 0.941 ± 0.025, **test F1 0.945**. Left: student IDs in the notebook, lecturer questions, D5 (video/live), registration sheet, submission.
+
 > How to use this file: tick boxes as you go, put your name in the **Owner** slot when you take something,
 > and resolve everything in section 1 before writing real code — the rest depends on it.
 
@@ -116,6 +118,8 @@ something always breaks.
 | 2.6 | Make the repo **public** (or confirm graders can access it) | | [ ] |
 | 2.7 | Download `SMS_train.csv` + `SMS_test.csv` into `data/raw/` and document the source in `data/README.md` | Adir | [x] |
 | 2.8 | Start `docs/prompts-log.md` and log LLM prompts **as we go** (see trap T4) | Adir | [x] |
+| 2.9 | Fill in both student IDs and Liav's family name in notebook Part 1 (`scripts/build_notebook.py`), then `python scripts/build_notebook.py` and `python -m nbconvert --execute --inplace notebooks/spam_sms_ann.ipynb` | both | [ ] |
+| 2.10 | Liav: clone the repo, create `.venv`, run `python -m pytest` (see README) | Liav | [ ] |
 
 ⚠️ **Google Drive + git warning:** if we both have this folder syncing while either of us runs git, the `.git`
 directory can corrupt. Once GitHub is up, treat GitHub as the source of truth and work from a clone that
@@ -129,33 +133,33 @@ The graded deliverable is one notebook following exactly this structure.
 
 ### Part 1 — Introduction
 
-- [ ] Student details: **family name + first 4 digits of ID** for each of us
-- [ ] The LLM / chatbot prompts we used, with links to the conversations, and what we used them for
-- [ ] Explanation of the learning problem and the dataset
-- [ ] Load the train set and the test set — **as provided, no re-splitting**
-- [ ] Display the first 5 rows
+- [ ] Student details: **family name + first 4 digits of ID** for each of us — **the notebook has `TODO(team)` markers in Part 1; edit `scripts/build_notebook.py`, rebuild, re-execute**
+- [x] The LLM / chatbot prompts we used, with links to the conversations, and what we used them for
+- [x] Explanation of the learning problem and the dataset
+- [x] Load the train set and the test set — **as provided, no re-splitting**
+- [x] Display the first 5 rows
 
 ### Part 2 — Feature engineering
 
-- [ ] Implement the feature extraction for our chosen track (text or image)
-- [ ] Explain *why* each feature makes sense for this problem
-- [ ] Demonstrate the transformation on **2–3 concrete examples from train AND from test**
-- [ ] *(optional bonus)* additional feature engineering
+- [x] Implement the feature extraction for our chosen track (text or image)
+- [x] Explain *why* each feature makes sense for this problem
+- [x] Demonstrate the transformation on **2–3 concrete examples from train AND from test**
+- [x] *(optional bonus)* additional feature engineering
 
 ### Part 3 — Implement the learning algorithm
 
-- [ ] Write the algorithm **ourselves** — not a library call
-- [ ] Expose a `fit(X, y)` function and a `predict(X)` function
-- [ ] Make the hyperparameters configurable
-- [ ] Explain how the algorithm works, in the notebook and in the presentation
-- [ ] Unit-test it — for an ANN a **gradient check** is essential, because hand-written backprop fails silently
+- [x] Write the algorithm **ourselves** — not a library call
+- [x] Expose a `fit(X, y)` function and a `predict(X)` function
+- [x] Make the hyperparameters configurable
+- [x] Explain how the algorithm works, in the notebook and in the presentation *(notebook done; presentation pending)*
+- [x] Unit-test it — for an ANN a **gradient check** is essential, because hand-written backprop fails silently
 
 ### Part 4 — Training with different hyperparameters
 
-- [ ] Run the full flow across several hyperparameter combinations
-- [ ] Compare them using our quality metric from D3
-- [ ] Show the pipeline on **2–3 examples** as they pass through feature engineering
-- [ ] Pick and justify the winning combination
+- [x] Run the full flow across several hyperparameter combinations
+- [x] Compare them using our quality metric from D3
+- [x] Show the pipeline on **2–3 examples** as they pass through feature engineering
+- [x] Pick and justify the winning combination
 
 ⚠️ Tuning needs validation data, but we may not re-split the given train/test. Use **k-fold
 cross-validation inside the train set only** and say so explicitly in the notebook — the test set stays
@@ -163,11 +167,11 @@ sealed until Part 5.
 
 ### Part 5 — Prediction and evaluation on the test set
 
-- [ ] Apply the winning combination to the whole test set
-- [ ] Show the pipeline on **2–3 test examples**
-- [ ] Show the **first 5 predictions**
-- [ ] Report the quality metric from D3
-- [ ] Brief discussion: where does the model fail, and why?
+- [x] Apply the winning combination to the whole test set
+- [x] Show the pipeline on **2–3 test examples**
+- [x] Show the **first 5 predictions**
+- [x] Report the quality metric from D3
+- [x] Brief discussion: where does the model fail, and why?
 
 ---
 
@@ -220,7 +224,7 @@ One of us registers the group; **all fields must be filled**.
 | T3 | Implementing only KNN | Called out in the PDF as not advanced enough. |
 | T4 | Reconstructing the LLM prompt log at the end | Impossible after the fact. Log prompts **as we go**. |
 | T5 | Wrong quality metric | Binary → F1 on the positive class. Multi-class → macro-F1. Regression → R². |
-| T6 | A repo with code but no run output | The PDF requires outputs to be committed. Run all cells before the final push. |
+| T6 | A repo with code but no run output | The PDF requires outputs to be committed. The notebook is executed with `nbconvert --execute --inplace` before every push that touches it (outputs are in git). |
 | T7 | A dead or permission-locked link | No video / no working code link = significant penalty. Test incognito. |
 | T8 | Video over 5 minutes, or missing | Penalty. |
 | T9 | Notebook missing or not working | "A task without a notebook will not be checked." |

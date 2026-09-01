@@ -133,7 +133,7 @@ The graded deliverable is one notebook following exactly this structure.
 
 ### Part 1 — Introduction
 
-- [x] Student details: **family name + first 4 digits of ID** for each of us — Buskila 2094 · Weizman 3249, in notebook Part 1
+- [x] Student details: **first name + initial of the family name + LAST 4 digits of ID** (PDF p.4) — Adir B. 7727 · Liav W. 6898, in notebook Part 1
 - [x] The LLM / chatbot prompts we used, with links to the conversations, and what we used them for
 - [x] Explanation of the learning problem and the dataset
 - [x] Load the train set and the test set — **as provided, no re-splitting**

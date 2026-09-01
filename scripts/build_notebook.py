@@ -36,10 +36,10 @@ md("""
 
 ### Students
 
-| Family name | ID (first 4 digits) |
+| Student (first name + initial) | ID (last 4 digits) |
 |---|---|
-| Buskila (בוסקילה) | 2094 |
-| Weizman (ויצמן) | 3249 |
+| Adir B. (אדיר ב׳) | 7727 |
+| Liav W. (ליאב ו׳) | 6898 |
 
 ### AI assistants we used
 

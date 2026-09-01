@@ -146,7 +146,7 @@ returns 0.0 (documented). Written by us, validated against sklearn in tests.
 
 Markdown headers use the assignment's own part names so the grader can navigate.
 
-1. **Part 1 — Introduction**: student details (family name + first 4 ID digits, filled by the team);
+1. **Part 1 — Introduction**: student details (first name + initial of the family name + last 4 ID digits, as the PDF asks);
    LLM usage summary with links (mirrors `docs/prompts-log.md`); the learning problem and dataset;
    load train and test **as provided**; `head()` of both; class balance bar chart; a note that the test
    set is now sealed until Part 5.

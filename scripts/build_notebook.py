@@ -1,7 +1,8 @@
 """Assemble notebooks/spam_sms_ann.ipynb from Python so the notebook is reproducible and diff-able.
 
 Run:  .venv/Scripts/python.exe scripts/build_notebook.py
-Then: .venv/Scripts/python.exe -m jupyter nbconvert --to notebook --execute --inplace notebooks/spam_sms_ann.ipynb
+Then: .venv/Scripts/python.exe -m nbconvert --to notebook --execute --inplace notebooks/spam_sms_ann.ipynb
+      (python -m nbconvert, not the `jupyter` launcher, so the kernel is guaranteed to be this venv)
 """
 from __future__ import annotations
 
@@ -332,6 +333,306 @@ plt.tight_layout(); plt.show()
 
 train_pred = first_model.predict(X_train)
 print(f"training-set F1 (optimistic - same data it was fitted on): {f1_score(y_train, train_pred):.3f}")
+""")
+
+
+# ----------------------------------------------------------------------------- Part 4
+md("""
+## Part 4 — Training with different hyperparameters
+
+### How we compare configurations without touching the test set
+
+Tuning needs data the model has not been trained on, but the assignment forbids re-splitting the given files.
+So every configuration is scored with **stratified 5-fold cross-validation inside the training set**
+(`src/cv.py`): the 957 training messages are dealt into 5 folds with the same spam share; in turn each fold is
+held out, the feature pipeline **and** the network are fitted on the other four, and the held-out fold is
+scored. We report the mean and standard deviation of the Spam-class F1 over the 5 folds. The test set stays
+sealed until Part 5.
+
+### The grid
+
+We start from a reference configuration — one hidden layer of 32 ReLU units, learning rate 2.0, 40 epochs,
+batch size 32, TF-IDF + handcrafted features — and vary one knob at a time, plus a few combinations
+(12 configurations; the whole run takes well under a minute). The learning-rate centre came from a quick
+calibration run on the training set (CV F1 0.90 at 0.1, 0.93 at 0.5, 0.94 at 2.0 for the reference
+architecture) — TF-IDF rows have unit norm, so the gradients are small and unusually large step sizes are
+normal.
+
+| knob | values tried | question it answers |
+|---|---|---|
+| `hidden_layers` | `()` = logistic regression, `(32,)`, `(64, 32)` | does depth help over a linear model? |
+| `learning_rate` | 0.5, 2.0, 8.0 | is SGD stable and fast enough? |
+| `activation` | relu, tanh | does the non-linearity matter? |
+| `class_weight` | None, "balanced" | does up-weighting the rare spam class help F1? |
+| `use_extra` | False, True | do the 7 handcrafted cues add anything to TF-IDF? |
+| `l2`, `batch_size` | 0 vs 1e-3, 32 vs 8 | regularisation and noisier gradients |
+""")
+
+code("""
+LR_MID = 2.0          # centre of the learning-rate grid (from the calibration run described above)
+
+def config(name, hidden=(32,), activation="relu", lr=LR_MID, class_weight=None, use_extra=True, l2=0.0, batch_size=32):
+    return {"name": name,
+            "features": {"max_features": 2000, "min_df": 2, "use_extra": use_extra},
+            "model": {"hidden_layers": hidden, "activation": activation, "learning_rate": lr, "epochs": 40,
+                      "batch_size": batch_size, "l2": l2, "class_weight": class_weight, "seed": SEED}}
+
+configs = [
+    config("logreg / tfidf only",             hidden=(), use_extra=False),
+    config("logreg / +extra",                 hidden=()),
+    config("mlp32 / tfidf only",              use_extra=False),
+    config("mlp32 / +extra  (reference)"),
+    config("mlp32 / +extra / balanced",       class_weight="balanced"),
+    config("mlp32 / +extra / tanh",           activation="tanh"),
+    config("mlp32 / +extra / lr 0.5",         lr=LR_MID / 4),
+    config("mlp32 / +extra / lr 8.0",         lr=LR_MID * 4),
+    config("mlp32 / +extra / l2=1e-3",        l2=1e-3),
+    config("mlp32 / +extra / batch 8",        batch_size=8),
+    config("mlp64-32 / +extra",               hidden=(64, 32)),
+    config("mlp64-32 / +extra / balanced",    hidden=(64, 32), class_weight="balanced"),
+]
+
+t0 = time.perf_counter()
+results = run_grid(train_texts, y_train, configs, k=5, seed=SEED)
+print(f"\\ntotal: {time.perf_counter() - t0:.0f}s")
+""")
+
+code("""
+table = results[["name", "hidden_layers", "activation", "learning_rate", "class_weight", "use_extra", "l2",
+                 "batch_size", "f1_mean", "f1_std", "precision_mean", "recall_mean", "diverged_folds", "seconds"]].copy()
+for col in ["f1_mean", "f1_std", "precision_mean", "recall_mean"]:
+    table[col] = table[col].round(3)
+table["seconds"] = table["seconds"].round(1)
+display(table)
+
+fig, ax = plt.subplots(figsize=(8, 4.5))
+order = results.iloc[::-1]
+ax.barh(order["name"], order["f1_mean"], xerr=order["f1_std"], color="#4C72B0", capsize=3)
+ax.set_xlabel("cross-validated F1 on the Spam class (mean ± std over 5 folds)")
+ax.set_xlim(max(0.0, float(order["f1_mean"].min()) - 0.15), 1.0)
+ax.set_title("Hyperparameter comparison (train-set CV only)")
+plt.tight_layout(); plt.show()
+""")
+
+md("""
+### Choosing the winning configuration
+
+With 957 training messages the fold-to-fold standard deviation of F1 is about 0.03, so configurations that
+differ by a few thousandths are **not distinguishable** — picking the raw maximum would just be picking noise.
+We therefore use the standard **one-standard-error rule**: take the best mean F1, compute its standard error
+(std / √5), and among all configurations within one standard error of the best choose the **simplest** one
+(fewest hidden units; ties broken by mean F1). Simpler models are cheaper, easier to explain, and less likely
+to have won by chance.
+""")
+
+code("""
+K_FOLDS = 5
+top = results.iloc[0]
+one_se = top["f1_std"] / np.sqrt(K_FOLDS)
+candidates = results[results["f1_mean"] >= top["f1_mean"] - one_se].copy()
+candidates["hidden_units"] = candidates["hidden_layers"].apply(sum)
+candidates = candidates.sort_values(["hidden_units", "f1_mean"], ascending=[True, False], kind="stable")
+print(f"best mean F1 = {top['f1_mean']:.3f} ({top['name']});  one standard error = {one_se:.3f};  "
+      f"threshold = {top['f1_mean'] - one_se:.3f}")
+print("configurations within one standard error of the best, simplest first:")
+display(candidates[["name", "hidden_layers", "hidden_units", "f1_mean", "f1_std", "precision_mean", "recall_mean"]].round(3))
+
+best = candidates.iloc[0]
+best_cfg = next(c for c in configs if c["name"] == best["name"])
+print("WINNER:", best["name"])
+print("  CV F1 = %.3f ± %.3f   precision = %.3f   recall = %.3f" % (best["f1_mean"], best["f1_std"], best["precision_mean"], best["recall_mean"]))
+print("  features:", best_cfg["features"])
+print("  model   :", best_cfg["model"])
+""")
+
+md("""
+**What the grid tells us** (all numbers are 5-fold CV F1 on the Spam class, inside the training set):
+
+* **The handcrafted cues are the single most useful change.** They lift logistic regression from 0.897 to
+  0.918 and the 32-unit network from 0.905 to 0.941, almost entirely through recall (0.870 → 0.927 for the
+  network): length, digit count, currency and phone/URL flags catch spam whose *words* are unremarkable.
+* **One hidden layer helps, a second does not.** With the same features the network beats logistic regression
+  by 0.023 (0.918 → 0.941), again through recall — the non-linearity lets it combine cues ("long *and* has a
+  phone number") that a linear model can only add up. Going deeper (64-32 units, three times the parameters)
+  adds 0.001, i.e. nothing measurable.
+* **Learning rate** is the classic U-shape: 0.5 is too slow for 40 epochs (0.929), 2.0 is best (0.941), 8.0
+  starts to thrash (0.915, precision drops to 0.909).
+* **`class_weight="balanced"`** did not pay off. For the 32-unit network it left recall unchanged and cost
+  precision (0.933). For the deeper network it made SGD **diverge in 4 of 5 folds**: weighting the spam rows
+  ×6.8 multiplies their gradient, which at learning rate 2.0 is enough to blow the weights up — a useful
+  reminder that class weights and the learning rate are not independent knobs.
+* `tanh` vs `relu` (0.932 vs 0.941), L2 = 1e-3 (0.922) and batch size 8 (0.912) are all within noise or
+  slightly worse; none earns its extra complexity.
+
+**Decision.** The best mean F1 is 0.942 (`mlp64-32 / +extra`) with a standard error of 0.011, so every
+configuration above 0.931 is statistically tied with it: the reference `mlp32 / +extra` (0.941), its
+`balanced` (0.933) and `tanh` (0.932) variants, and the deeper network itself. Among the tied
+configurations the one-standard-error rule picks the simplest — 32 hidden units — and, within those, the
+highest F1: **`mlp32 / +extra`: one hidden layer of 32 ReLU units, learning rate 2.0, 40 epochs, batch
+size 32, no L2, no class weighting, TF-IDF (1 142 tokens) + 7 handcrafted features.** This choice was
+fixed here, before the test set was opened; the runner-up is *not* evaluated on the test set, so the
+number reported in Part 5 is a clean estimate for the single model we committed to.
+""")
+
+md("""
+### The winning flow on 2–3 training examples
+
+The same three training messages as in Part 2, now passed through the winning feature configuration and
+scored by a model trained with the winning hyperparameters on **all** training data — this is the model
+that goes to the test set in Part 5.
+""")
+
+code("""
+best_pipe = FeaturePipeline(**best_cfg["features"]).fit(train_texts)
+best_model = NeuralNetwork(**best_cfg["model"]).fit(best_pipe.transform(train_texts), y_train)
+
+def show_flow(texts, labels, pipeline, model):
+    for text, label in zip(texts, labels):
+        vec = pipeline.transform([text])
+        p = float(model.predict_proba(vec)[0])
+        print("-" * 100)
+        print(f"[{LABEL_NAMES[int(label)]}]  {text}")
+        print("  tokens     :", tokenize(text))
+        print("  top tf-idf :", [(t, round(w, 3)) for t, w in pipeline.tfidf_.explain(text, k=5)])
+        if pipeline.use_extra:
+            print("  handcrafted:", {n: round(float(v), 1) for n, v in zip(HANDCRAFTED_NAMES, handcrafted_features([text])[0])})
+        print(f"  -> {vec.shape[1]} features -> P(spam) = {p:.3f} -> predicted {LABEL_NAMES[int(p >= 0.5)]}")
+
+show_flow([train_texts[i] for i in train_examples], y_train[train_examples], best_pipe, best_model)
+""")
+
+# ----------------------------------------------------------------------------- Part 5
+md("""
+## Part 5 — Prediction and evaluation on the test set
+
+Now — and only now — the test set is used for evaluation. The winning pipeline and model from Part 4 were
+fitted on the **whole training set**; here they are merely *applied* to `SMS_test.csv`. Nothing is re-fitted.
+""")
+
+code("""
+X_test = best_pipe.transform(test_texts)
+test_proba = best_model.predict_proba(X_test)
+test_pred = (test_proba >= 0.5).astype(int)
+print(f"test feature matrix: {X_test.shape}   predicted spam: {int(test_pred.sum())} of {len(test_pred)}")
+""")
+
+md("""
+### The flow on 2–3 test messages
+
+The same three test messages as in Part 2, through the winning pipeline and model.
+""")
+
+code("""
+show_flow([test_texts[i] for i in test_examples], y_test[test_examples], best_pipe, best_model)
+""")
+
+md("""
+### The first 5 test predictions
+""")
+
+code("""
+first5 = pd.DataFrame({
+    "message": [t[:90] + ("…" if len(t) > 90 else "") for t in test_texts[:5]],
+    "true label": [LABEL_NAMES[int(v)] for v in y_test[:5]],
+    "P(spam)": np.round(test_proba[:5], 3),
+    "predicted": [LABEL_NAMES[int(v)] for v in test_pred[:5]],
+})
+first5
+""")
+
+md("""
+### Quality on the whole test set
+
+The assignment's metric for a binary problem is the **F1 score of the positive class (Spam)**; precision,
+recall, accuracy and the confusion matrix are shown for context.
+""")
+
+code("""
+cm = confusion_matrix(y_test, test_pred)
+print(f"F1 (Spam)  = {f1_score(y_test, test_pred):.3f}   <- the assignment's quality metric")
+print(f"precision  = {precision(y_test, test_pred):.3f}   recall = {recall(y_test, test_pred):.3f}   accuracy = {accuracy(y_test, test_pred):.3f}")
+print("\\nconfusion matrix (rows = true, columns = predicted):")
+display(pd.DataFrame(cm, index=["true Non-Spam", "true Spam"], columns=["pred Non-Spam", "pred Spam"]))
+
+fig, ax = plt.subplots(figsize=(3.6, 3.2))
+ax.imshow(cm, cmap="Blues")
+for (i, j), v in np.ndenumerate(cm):
+    ax.text(j, i, str(v), ha="center", va="center", color="white" if v > cm.max() / 2 else "black", fontsize=14)
+ax.set_xticks([0, 1]); ax.set_xticklabels(["Non-Spam", "Spam"]); ax.set_yticks([0, 1]); ax.set_yticklabels(["Non-Spam", "Spam"])
+ax.set_xlabel("predicted"); ax.set_ylabel("true"); ax.set_title("Test-set confusion matrix")
+plt.tight_layout(); plt.show()
+""")
+
+md("""
+### Where does the model fail?
+""")
+
+code("""
+errors = pd.DataFrame({
+    "message": test_texts, "true": [LABEL_NAMES[int(v)] for v in y_test],
+    "P(spam)": np.round(test_proba, 3), "predicted": [LABEL_NAMES[int(v)] for v in test_pred],
+})
+errors = errors[errors["true"] != errors["predicted"]]
+print(f"{len(errors)} misclassified test messages out of {len(test_texts)}")
+pd.set_option("display.max_colwidth", 170)
+display(errors)
+
+train_set = set(train_texts)
+overlap = [i for i, t in enumerate(test_texts) if t in train_set]
+print(f"\\nnote: {len(overlap)} test messages also occur verbatim in the training file (kept - the files are used as shipped); "
+      f"{int((test_pred[overlap] == y_test[overlap]).sum())} of them are classified correctly")
+""")
+
+md("""
+### Discussion
+
+**Headline.** On the 125 test messages the chosen model reaches **F1 = 0.945** on the Spam class
+(precision 0.986, recall 0.908, accuracy 0.936). It flagged 70 messages as spam; 69 of them were spam and it
+missed 7. This is right in line with the cross-validated estimate from Part 4 (0.941 ± 0.025), so model
+selection did not overfit the training set.
+
+**Where it fails — the 7 missed spam messages (false negatives).** They share one property: they lack the
+"hard" spam signals the model leans on most — a phone number, a URL, a currency amount, a *win/claim/prize*
+vocabulary — and instead read like personal texts:
+
+* *Subscription / content-service spam with no call to action:* "Ringtone Club: Get the UK singles chart…"
+  (P(spam) = 0.17), "Thanks for your subscription to Ringtone UK… £5/month… reply YES or NO" (0.18),
+  "SMS. ac Sptv: … Correct or Incorrect? Reply END SPTV" (0.02). Words like *ringtone*, *subscription*,
+  *reply* are too rare among the 122 training spam messages to have learned strong weights.
+* *Spam written in the same abbreviations as personal messages:* "Will u meet ur dream partner soon?… txt
+  HORO" (0.01), "BangBabes Ur order is on the way… GoTo wap. bangb. tv" (0.02), "FreeMsg Hey there
+  darling…" (0.07). The *u / ur / 2* style is typical of the hams in this corpus, and in the BangBabes
+  message the link is broken up by spaces ("wap. bangb. tv"), so the URL detector never fires.
+* *Probable label noise:* "Did you hear about the new 'Divorce Barbie'? It comes with all of Ken's stuff!"
+  (0.001) is a joke between friends. It is labelled Spam in the file, but no reasonable classifier would —
+  or should — flag it.
+
+**The one false alarm.** "7 wonders in My WORLD 7th You 6th Ur style 5th Ur smile… good morning dear"
+(P(spam) = 0.61, a borderline call) is a chain/forward message: long, seven ordinal numbers that all become
+`__num__`, capitalised words — precisely the *style* cues that make spam recognisable. The model is right
+that it looks like broadcast content; the dataset happens to label it as a personal message.
+
+**Pattern.** The classifier is very *precise* (1 false alarm in 49 legitimate messages) and its misses are
+concentrated in spam that imitates personal texting. That is the expected behaviour of a bag-of-words model
+with style features trained on 957 messages, and it is the safer failure mode for a spam filter — hiding a
+real message costs the user more than letting one advertisement through.
+
+**Context that qualifies these numbers.**
+
+1. *Distribution shift.* The training file is 12.7 % spam, the test file 60.8 %. F1 on the Spam class is the
+   right summary either way, but accuracy is not comparable between the two, and the high spam share makes
+   test precision look a little better than it would on a realistic inbox (fewer legitimate messages means
+   fewer chances for a false alarm).
+2. *Overlap.* 5 of the 125 test messages also appear verbatim in the training file (3 spam, 2 ham). They are
+   all classified correctly; without them the test F1 would be 0.943 — essentially unchanged.
+3. *Small test set.* With 76 spam messages, every missed one moves recall by 1.3 points and F1 by roughly
+   0.7 points. The honest reading is "F1 somewhere around 0.94 ± 0.04", not "0.945".
+
+**What we would try next** (all tuned with cross-validation, never on the test set): a lower decision
+threshold — precision is 0.986, so there is room to trade some of it for recall (two of the misses have
+P(spam) ≈ 0.17–0.18); normalising SMS slang (*u → you, ur → your*) and character n-grams, so that spam in
+texting style is not mistaken for a friend; a URL detector tolerant of spaces around dots; and simply more
+training spam — 122 examples is not much to learn "ringtone subscription" from.
 """)
 
 

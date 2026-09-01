@@ -38,8 +38,8 @@ md("""
 
 | Family name | ID (first 4 digits) |
 |---|---|
-| Buskila | TODO(team) |
-| TODO(team: Liav's family name) | TODO(team) |
+| Buskila (בוסקילה) | 2094 |
+| Weizman (ויצמן) | 3249 |
 
 ### AI assistants we used
 

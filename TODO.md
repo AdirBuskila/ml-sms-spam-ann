@@ -7,7 +7,7 @@
 **Repo (source of truth):** `C:\Users\Adir\dev\ml-sms-spam-ann` -> https://github.com/AdirBuskila/ml-sms-spam-ann
 **🔥 DEADLINE: 10 September 2026**
 
-> **Status 2026-09-01:** code + tests + executed notebook are done and pushed. Winner `mlp32 / +extra`, CV F1 0.941 ± 0.025, **test F1 0.945**. Left: student IDs in the notebook, lecturer questions, D5 (video/live), registration sheet, submission.
+> **Status 2026-09-01:** code + tests + executed notebook are done and merged to `main`. Winner `mlp32 / +extra`, CV F1 0.941 ± 0.025, **test F1 0.945**. Student details are in the notebook. Left: lecturer questions, D5 (video/live — a Hebrew video script is in the Drive folder, `video-script-he.md`), registration sheet, submission.
 
 > How to use this file: tick boxes as you go, put your name in the **Owner** slot when you take something,
 > and resolve everything in section 1 before writing real code — the rest depends on it.
@@ -118,7 +118,7 @@ something always breaks.
 | 2.6 | Make the repo **public** (or confirm graders can access it) | | [ ] |
 | 2.7 | Download `SMS_train.csv` + `SMS_test.csv` into `data/raw/` and document the source in `data/README.md` | Adir | [x] |
 | 2.8 | Start `docs/prompts-log.md` and log LLM prompts **as we go** (see trap T4) | Adir | [x] |
-| 2.9 | Fill in both student IDs and Liav's family name in notebook Part 1 (`scripts/build_notebook.py`), then `python scripts/build_notebook.py` and `python -m nbconvert --execute --inplace notebooks/spam_sms_ann.ipynb` | both | [ ] |
+| 2.9 | Fill in both student IDs and Liav's family name in notebook Part 1 (`scripts/build_notebook.py`), then rebuild + re-execute | Adir | [x] |
 | 2.10 | Liav: clone the repo, create `.venv`, run `python -m pytest` (see README) | Liav | [ ] |
 
 ⚠️ **Google Drive + git warning:** if we both have this folder syncing while either of us runs git, the `.git`
@@ -133,7 +133,7 @@ The graded deliverable is one notebook following exactly this structure.
 
 ### Part 1 — Introduction
 
-- [ ] Student details: **family name + first 4 digits of ID** for each of us — **the notebook has `TODO(team)` markers in Part 1; edit `scripts/build_notebook.py`, rebuild, re-execute**
+- [x] Student details: **family name + first 4 digits of ID** for each of us — Buskila 2094 · Weizman 3249, in notebook Part 1
 - [x] The LLM / chatbot prompts we used, with links to the conversations, and what we used them for
 - [x] Explanation of the learning problem and the dataset
 - [x] Load the train set and the test set — **as provided, no re-splitting**
@@ -189,7 +189,7 @@ One of us registers the group; **all fields must be filled**.
 - [ ] Video URL
 - [ ] Repository URL
 - [ ] Contact emails — **only if they differ from the email used to submit the form**
-- [ ] Student name 1..5 (Hebrew, one per column)
+- [ ] Student name 1..5 (Hebrew, one per column) — אדיר בוסקילה, ליאב ויצמן
 - [ ] Email student 1..5 (one per column)
 
 ### The four links, submitted space-separated with no extra text

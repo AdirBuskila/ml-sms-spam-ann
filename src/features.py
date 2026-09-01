@@ -102,3 +102,86 @@ class TfidfFeaturizer:
         row = self.transform([text])[0]
         idx = np.argsort(-row, kind="stable")
         return [(self.feature_names_[j], float(row[j])) for j in idx[:k] if row[j] > 0]
+
+
+HANDCRAFTED_NAMES = [
+    "n_chars",           # spam tends to be long (it has to sell something)
+    "n_words",
+    "n_digits",          # prices, codes, phone numbers
+    "upper_ratio",       # SHOUTING: share of letters that are upper-case
+    "n_exclaim",         # "WINNER!!"
+    "has_currency",      # £ $ €
+    "has_url_or_phone",  # a link or a phone number to act on
+]
+
+
+def handcrafted_features(texts) -> np.ndarray:
+    """Seven cheap, human-readable spam cues per message (float64, shape (n, 7))."""
+    rows = []
+    for text in texts:
+        letters = [c for c in text if c.isalpha()]
+        upper_ratio = sum(c.isupper() for c in letters) / len(letters) if letters else 0.0
+        rows.append([
+            len(text),
+            len(text.split()),
+            sum(c.isdigit() for c in text),
+            upper_ratio,
+            text.count("!"),
+            float(any(c in _CURRENCY for c in text)),
+            float(bool(_URL_RE.search(text) or _PHONE_RE.search(text))),
+        ])
+    return np.asarray(rows, dtype=np.float64).reshape(len(rows), len(HANDCRAFTED_NAMES))
+
+
+class Standardizer:
+    """z-score each column with the mean/std of the data it was fitted on (the training set)."""
+
+    def fit(self, X) -> "Standardizer":
+        X = np.asarray(X, dtype=np.float64)
+        self.mean_ = X.mean(axis=0)
+        std = X.std(axis=0)
+        std[std == 0.0] = 1.0
+        self.std_ = std
+        return self
+
+    def transform(self, X) -> np.ndarray:
+        if not hasattr(self, "mean_"):
+            raise RuntimeError("Standardizer.fit must be called before transform")
+        return (np.asarray(X, dtype=np.float64) - self.mean_) / self.std_
+
+
+class FeaturePipeline:
+    """text -> [tf-idf block | standardised handcrafted block]  (the second block is optional).
+
+    Everything with state (vocabulary, idf, means, stds) is learned in fit() from the texts
+    passed to it - always the training part - and merely applied in transform().
+    """
+
+    def __init__(self, max_features: int | None = 2000, min_df: int = 2, use_extra: bool = True):
+        self.max_features = max_features
+        self.min_df = min_df
+        self.use_extra = use_extra
+
+    def fit(self, texts) -> "FeaturePipeline":
+        texts = list(texts)
+        self.tfidf_ = TfidfFeaturizer(self.max_features, self.min_df).fit(texts)
+        self.scaler_ = Standardizer().fit(handcrafted_features(texts)) if self.use_extra else None
+        self.feature_names_ = list(self.tfidf_.feature_names_) + (list(HANDCRAFTED_NAMES) if self.use_extra else [])
+        return self
+
+    def transform(self, texts) -> np.ndarray:
+        if not hasattr(self, "tfidf_"):
+            raise RuntimeError("FeaturePipeline.fit must be called before transform")
+        texts = list(texts)
+        X = self.tfidf_.transform(texts)
+        if self.use_extra:
+            extra = self.scaler_.transform(handcrafted_features(texts)).astype(np.float32)
+            X = np.hstack([X, extra])
+        return X
+
+    def fit_transform(self, texts) -> np.ndarray:
+        return self.fit(texts).transform(texts)
+
+    @property
+    def n_features_(self) -> int:
+        return len(self.feature_names_)

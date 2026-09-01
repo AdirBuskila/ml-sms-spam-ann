@@ -85,3 +85,71 @@ class TestTfidfFeaturizer:
         terms = feat.explain("free free call")
         assert terms[0][0] == "free" and terms[0][1] >= terms[1][1]
         assert all(w > 0 for _, w in terms)
+
+
+from src.features import HANDCRAFTED_NAMES, FeaturePipeline, Standardizer, handcrafted_features  # noqa: E402
+
+
+class TestHandcrafted:
+    def test_shape_and_names(self):
+        X = handcrafted_features(["hi", "WIN £1000 NOW!!! call 09061701461"])
+        assert X.shape == (2, len(HANDCRAFTED_NAMES)) and len(HANDCRAFTED_NAMES) == 7
+
+    def test_values_on_a_spammy_message(self):
+        row = dict(zip(HANDCRAFTED_NAMES, handcrafted_features(["WIN £1000 NOW!!! call 09061701461"])[0]))
+        assert row["n_chars"] == 33
+        assert row["n_words"] == 5
+        assert row["n_digits"] == 15
+        assert row["n_exclaim"] == 3
+        assert row["has_currency"] == 1.0
+        assert row["has_url_or_phone"] == 1.0
+        assert row["upper_ratio"] == pytest.approx(6 / 10)          # WINNOW + call -> 6 upper of 10 letters
+
+    def test_values_on_a_plain_message(self):
+        row = dict(zip(HANDCRAFTED_NAMES, handcrafted_features(["ok see you at home"])[0]))
+        assert row["n_digits"] == 0 and row["n_exclaim"] == 0
+        assert row["has_currency"] == 0.0 and row["has_url_or_phone"] == 0.0
+        assert row["upper_ratio"] == 0.0
+
+    def test_no_letters_gives_zero_upper_ratio(self):
+        assert handcrafted_features(["1234 !!!"])[0][HANDCRAFTED_NAMES.index("upper_ratio")] == 0.0
+
+    def test_empty_input_gives_empty_matrix(self):
+        assert handcrafted_features([]).shape == (0, 7)
+
+
+class TestStandardizer:
+    def test_zero_mean_unit_std_on_train_and_reuses_train_stats(self):
+        train = np.array([[1.0, 10.0], [3.0, 10.0], [5.0, 10.0]])
+        s = Standardizer().fit(train)
+        Z = s.transform(train)
+        np.testing.assert_allclose(Z.mean(axis=0), [0.0, 0.0], atol=1e-12)
+        np.testing.assert_allclose(Z[:, 0].std(), 1.0)
+        assert (Z[:, 1] == 0).all()                    # constant column: std 0 -> treated as 1, no NaN
+        np.testing.assert_allclose(s.transform([[3.0, 10.0]]), [[0.0, 0.0]])
+
+    def test_transform_before_fit_raises(self):
+        with pytest.raises(RuntimeError):
+            Standardizer().transform([[1.0]])
+
+
+class TestFeaturePipeline:
+    def test_shapes_with_and_without_extra(self):
+        pipe = FeaturePipeline(max_features=None, min_df=1, use_extra=True).fit(CORPUS)
+        X = pipe.transform(CORPUS)
+        assert X.dtype == np.float32
+        assert X.shape == (len(CORPUS), len(pipe.tfidf_.vocabulary_) + 7)
+        assert pipe.n_features_ == X.shape[1]
+        assert pipe.feature_names_[-7:] == HANDCRAFTED_NAMES
+        plain = FeaturePipeline(max_features=None, min_df=1, use_extra=False).fit(CORPUS)
+        assert plain.transform(CORPUS).shape == (len(CORPUS), len(plain.tfidf_.vocabulary_))
+        assert plain.scaler_ is None
+
+    def test_extra_block_is_standardised_with_train_statistics(self):
+        pipe = FeaturePipeline(max_features=None, min_df=1, use_extra=True).fit(CORPUS)
+        extra = pipe.transform(CORPUS)[:, -7:]
+        np.testing.assert_allclose(extra.mean(axis=0), 0.0, atol=1e-5)
+
+    def test_transform_before_fit_raises(self):
+        with pytest.raises(RuntimeError):
+            FeaturePipeline().transform(["x"])

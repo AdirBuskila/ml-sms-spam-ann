@@ -146,19 +146,29 @@ class NeuralNetwork:
         rng = self._init_weights(X.shape[1])
         sample_weight = self._sample_weights(y)
         self.loss_history_ = []
+        self.diverged_ = False
         n = len(y)
-        for epoch in range(self.epochs):
-            order = rng.permutation(n)
-            for start in range(0, n, self.batch_size):
-                idx = order[start:start + self.batch_size]
-                activations, pre_activations = self._forward(X[idx])
-                grads_W, grads_b = self._backward(activations, pre_activations, y[idx], sample_weight[idx])
-                for layer in range(len(self.weights_)):
-                    self.weights_[layer] -= self.learning_rate * grads_W[layer]
-                    self.biases_[layer] -= self.learning_rate * grads_b[layer]
-            self.loss_history_.append(self._loss(X, y, sample_weight))
-            if self.verbose:
-                print(f"epoch {epoch + 1:3d}/{self.epochs}  loss = {self.loss_history_[-1]:.4f}")
+        # A too-large learning rate makes the weights overflow; NumPy would then warn on every
+        # operation. We silence those warnings here and instead detect the blow-up once per epoch.
+        with np.errstate(over="ignore", invalid="ignore"):
+            for epoch in range(self.epochs):
+                order = rng.permutation(n)
+                for start in range(0, n, self.batch_size):
+                    idx = order[start:start + self.batch_size]
+                    activations, pre_activations = self._forward(X[idx])
+                    grads_W, grads_b = self._backward(activations, pre_activations, y[idx], sample_weight[idx])
+                    for layer in range(len(self.weights_)):
+                        self.weights_[layer] -= self.learning_rate * grads_W[layer]
+                        self.biases_[layer] -= self.learning_rate * grads_b[layer]
+                loss = self._loss(X, y, sample_weight)
+                self.loss_history_.append(loss)
+                if self.verbose:
+                    print(f"epoch {epoch + 1:3d}/{self.epochs}  loss = {loss:.4f}")
+                if not np.isfinite(loss) or not all(np.isfinite(W).all() for W in self.weights_):
+                    self.diverged_ = True          # training blew up: stop, keep what we have
+                    if self.verbose:
+                        print("training diverged (non-finite loss or weights) - stopping early")
+                    break
         self.n_features_in_ = X.shape[1]
         return self
 
@@ -172,7 +182,10 @@ class NeuralNetwork:
         X = np.asarray(X, dtype=np.float64)
         if X.ndim != 2 or X.shape[1] != self.n_features_in_:
             raise ValueError(f"expected shape (n, {self.n_features_in_}), got {X.shape}")
-        return self._forward(X)[0][-1].ravel()
+        with np.errstate(over="ignore", invalid="ignore"):
+            p = self._forward(X)[0][-1].ravel()
+        # a diverged model has NaN weights; report "no evidence of spam" instead of NaN
+        return np.nan_to_num(p, nan=0.0, posinf=1.0, neginf=0.0)
 
     def predict(self, X, threshold: float = 0.5) -> np.ndarray:
         """1 (spam) where P(spam) >= threshold, else 0."""

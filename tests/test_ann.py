@@ -179,3 +179,22 @@ class TestTraining:
     def test_n_parameters(self):
         net = NeuralNetwork(hidden_layers=(5, 3)).fit(*blobs())
         assert net.n_parameters_ == (2 * 5 + 5) + (5 * 3 + 3) + (3 * 1 + 1)
+
+    def test_divergence_is_detected_silently_and_predictions_stay_finite(self):
+        """An absurd learning rate makes SGD blow up: fit must stop, flag it, and not emit NumPy warnings."""
+        import warnings
+
+        X, y = blobs()
+        X = X * 1000.0                                            # huge inputs + huge steps => overflow
+        net = NeuralNetwork(hidden_layers=(32, 32), learning_rate=1e6, epochs=50, seed=0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)        # any RuntimeWarning fails the test
+            net.fit(X, y)
+            p = net.predict_proba(X)
+        assert net.diverged_ is True
+        assert len(net.loss_history_) < 50                        # stopped early
+        assert np.isfinite(p).all() and set(np.unique(net.predict(X))) <= {0, 1}
+
+    def test_healthy_training_is_not_flagged_as_diverged(self):
+        net = NeuralNetwork(hidden_layers=(4,), epochs=5).fit(*blobs())
+        assert net.diverged_ is False

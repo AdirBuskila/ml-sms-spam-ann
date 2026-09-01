@@ -39,6 +39,7 @@ def cross_validate(texts, y, feature_params: dict, model_params: dict, k: int = 
     texts = list(texts)
     y = np.asarray(y)
     f1s, precs, recs = [], [], []
+    diverged = 0
     t0 = time.perf_counter()
     for train_idx, val_idx in stratified_kfold_indices(y, k=k, seed=seed):
         train_texts = [texts[i] for i in train_idx]
@@ -49,6 +50,7 @@ def cross_validate(texts, y, feature_params: dict, model_params: dict, k: int = 
         f1s.append(f1_score(y[val_idx], pred))
         precs.append(precision(y[val_idx], pred))
         recs.append(recall(y[val_idx], pred))
+        diverged += int(model.diverged_)
     return {
         "f1_mean": float(np.mean(f1s)),
         "f1_std": float(np.std(f1s)),
@@ -56,6 +58,7 @@ def cross_validate(texts, y, feature_params: dict, model_params: dict, k: int = 
         "precision_mean": float(np.mean(precs)),
         "recall_mean": float(np.mean(recs)),
         "seconds": time.perf_counter() - t0,
+        "diverged_folds": diverged,          # folds where SGD blew up (non-finite loss)
     }
 
 

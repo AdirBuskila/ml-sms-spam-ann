@@ -48,11 +48,19 @@ class TestCrossValidate:
         texts, y = toy_corpus()
         res = cross_validate(texts, y, {"max_features": None, "min_df": 1, "use_extra": False},
                              {"hidden_layers": (), "learning_rate": 1.0, "epochs": 30, "seed": 0}, k=3, seed=0)
-        assert set(res) == {"f1_mean", "f1_std", "f1_folds", "precision_mean", "recall_mean", "seconds"}
+        assert set(res) == {"f1_mean", "f1_std", "f1_folds", "precision_mean", "recall_mean", "seconds",
+                            "diverged_folds"}
         assert len(res["f1_folds"]) == 3
         assert res["f1_mean"] == pytest.approx(np.mean(res["f1_folds"]))
         assert res["f1_mean"] > 0.9
         assert res["seconds"] >= 0
+        assert res["diverged_folds"] == 0
+
+    def test_counts_folds_where_training_diverged(self):
+        texts, y = toy_corpus()
+        res = cross_validate(texts, y, {"max_features": None, "min_df": 1, "use_extra": True},
+                             {"hidden_layers": (32, 32), "learning_rate": 1e6, "epochs": 20, "seed": 0}, k=3, seed=0)
+        assert res["diverged_folds"] == 3
 
     def test_is_deterministic(self):
         texts, y = toy_corpus()
@@ -76,5 +84,5 @@ class TestRunGrid:
         assert df["f1_mean"].is_monotonic_decreasing
         for col in ["hidden_layers", "activation", "learning_rate", "batch_size", "l2", "class_weight",
                     "epochs", "use_extra", "max_features", "min_df", "f1_mean", "f1_std",
-                    "precision_mean", "recall_mean", "seconds"]:
+                    "precision_mean", "recall_mean", "seconds", "diverged_folds"]:
             assert col in df.columns

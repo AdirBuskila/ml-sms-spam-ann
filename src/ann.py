@@ -11,6 +11,7 @@ import numpy as np
 
 _ACTIVATIONS = ("relu", "tanh", "sigmoid")
 _EPS = 1e-12
+_MAX_ABS_WEIGHT = 1e6      # weights beyond this magnitude only ever mean SGD has blown up
 
 
 def _sigmoid(z: np.ndarray) -> np.ndarray:
@@ -164,10 +165,11 @@ class NeuralNetwork:
                 self.loss_history_.append(loss)
                 if self.verbose:
                     print(f"epoch {epoch + 1:3d}/{self.epochs}  loss = {loss:.4f}")
-                if not np.isfinite(loss) or not all(np.isfinite(W).all() for W in self.weights_):
+                exploded = any(not np.isfinite(W).all() or np.abs(W).max() > _MAX_ABS_WEIGHT for W in self.weights_)
+                if not np.isfinite(loss) or exploded:
                     self.diverged_ = True          # training blew up: stop, keep what we have
                     if self.verbose:
-                        print("training diverged (non-finite loss or weights) - stopping early")
+                        print("training diverged (non-finite loss or exploding weights) - stopping early")
                     break
         self.n_features_in_ = X.shape[1]
         return self

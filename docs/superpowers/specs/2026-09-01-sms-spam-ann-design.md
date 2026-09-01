@@ -29,11 +29,13 @@ Everything the grader looks for, in one place:
 **Kaggle:** <https://www.kaggle.com/datasets/datatattle/email-classification-nlp>
 (title says "E-Mail", content is SMS; same family as the UCI SMS Spam Collection).
 
-- Files shipped by Kaggle: `SMS_train.csv` (~950 rows) and `SMS_test.csv` (125 rows).
+- Files shipped by Kaggle (verified 2026-09-01, see `data/README.md`): `SMS_train.csv` — 957 rows,
+  835 Non-Spam / 122 Spam (12.7 %); `SMS_test.csv` — 125 rows, 49 Non-Spam / 76 Spam (60.8 %).
 - Columns: `S. No.`, `Message_body`, `Label` with values `Spam` / `Non-Spam`.
-- Known quirks (handled at load time, documented in the notebook): non-UTF-8 bytes
-  (`£` appears as `�` in Kaggle's preview) → load with an explicit encoding and verify;
-  the test set is ~61 % spam while train is spam-minority → mention as distribution shift in Part 5.
+- Known quirks (handled at load time, disclosed in the notebook): files are **cp1252**, not UTF-8
+  (`£` = byte 0xA3) → `encoding="cp1252"`; test rows are sorted spam-first (rows 1–66 are all Spam);
+  5 test messages also occur verbatim in train (labels agree) — kept, but mentioned in Part 5;
+  train is spam-minority while test is spam-majority → distribution shift discussed in Part 5.
 
 **Rules we impose on ourselves**
 

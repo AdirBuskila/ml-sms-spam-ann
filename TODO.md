@@ -52,7 +52,7 @@ Starting points given in the PDF:
   Caveats: small test set; test is ~61% spam; some `£` bytes are mangled - handle at load time.
 - [x] Dataset chosen
 - [x] Verified it has a ready-made train/test split (2 files in Kaggle's Data Explorer)
-- [ ] Both of us can download it (Adir: in progress; Liav: pending)
+- [ ] Both of us can download it (Adir: done 2026-09-01; Liav: pending)
 
 ### D3 — Learning type: classification / regression / clustering?
 
@@ -114,7 +114,7 @@ something always breaks.
 | 2.4 | Create a virtualenv **outside** this Google Drive folder — `.venv` inside the repo at `C:\Users\Adir\dev\ml-sms-spam-ann` (uv, Python 3.13) | Adir | [x] |
 | 2.5 | Create the GitHub repo and push | | [ ] |
 | 2.6 | Make the repo **public** (or confirm graders can access it) | | [ ] |
-| 2.7 | Download `SMS_train.csv` + `SMS_test.csv` into `data/raw/` and document the source in `data/README.md` | Adir | [ ] |
+| 2.7 | Download `SMS_train.csv` + `SMS_test.csv` into `data/raw/` and document the source in `data/README.md` | Adir | [x] |
 | 2.8 | Start `docs/prompts-log.md` and log LLM prompts **as we go** (see trap T4) | Adir | [x] |
 
 ⚠️ **Google Drive + git warning:** if we both have this folder syncing while either of us runs git, the `.git`

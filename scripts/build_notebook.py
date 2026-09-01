@@ -71,6 +71,12 @@ prescribed by the assignment for binary problems is the **F1 score of the positi
   `SMS_test.csv` (125 messages), which is opened only in Part 5.
 * Columns: `S. No.` (row number), `Message_body` (the text), `Label` ∈ {`Spam`, `Non-Spam`}.
 * The files are encoded in Windows-1252 (the `£` sign is byte `0xA3`), so they are read with `encoding="cp1252"`.
+
+**Reproducing this notebook.** Everything below is already executed and its outputs are committed, so nothing
+has to be run to read it. To re-run: clone <https://github.com/AdirBuskila/ml-sms-spam-ann>, install
+`requirements.txt` (Python 3.13), and run this notebook from inside the repository — it imports the `src/`
+package and reads `data/raw/`. A full top-to-bottom run takes about half a minute on a laptop; the unit tests
+run with `python -m pytest`.
 """)
 
 code("""

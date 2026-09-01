@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.13, NumPy, pandas, matplotlib, nbformat/nbconvert (Jupyter); pytest + scikit-learn **as a test oracle only**.
 
-**Spec:** `docs/superpowers/specs/2026-09-01-sms-spam-ann-design.md`
+**Spec:** `docs/design-spec.md`
 
 ## Global Constraints
 

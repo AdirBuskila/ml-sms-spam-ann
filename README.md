@@ -10,7 +10,7 @@ cross-validation on the training set and evaluated once on the test set that Kag
   (`SMS_train.csv` / `SMS_test.csv`, used exactly as provided — never re-split)
 - Metric: **F1 on the positive class (Spam)**
 - The graded notebook: [`notebooks/spam_sms_ann.ipynb`](notebooks/spam_sms_ann.ipynb)
-- Design: [`docs/superpowers/specs/2026-09-01-sms-spam-ann-design.md`](docs/superpowers/specs/2026-09-01-sms-spam-ann-design.md)
+- Design: [`docs/design-spec.md`](docs/design-spec.md) · implementation plan: [`docs/implementation-plan.md`](docs/implementation-plan.md)
 - LLM prompts used: [`docs/prompts-log.md`](docs/prompts-log.md)
 
 ## Results

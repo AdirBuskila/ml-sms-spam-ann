@@ -73,7 +73,8 @@ ml-sms-spam-ann/
 │   └── spam_sms_ann.ipynb     THE graded deliverable — 5 parts, executed, outputs committed
 └── docs/
     ├── prompts-log.md         LLM prompts, links, what they were used for (kept as we go)
-    └── superpowers/specs|plans/
+    ├── design-spec.md         this document
+    └── implementation-plan.md the task-by-task plan derived from it
 ```
 
 Environment: Python 3.13 in `.venv` (created with `uv`), `python -m pytest` from the repo root,

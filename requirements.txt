@@ -1,0 +1,14 @@
+# Core (the learning algorithm itself is implemented from scratch in NumPy)
+numpy>=2.0
+pandas>=2.2
+matplotlib>=3.9
+
+# Notebook
+jupyter>=1.0
+ipykernel>=6.29
+nbconvert>=7.16
+
+# Tests only: sklearn is used as an oracle to validate our own TF-IDF / metrics,
+# never for the learning algorithm (assignment Part 3 requires our own implementation)
+pytest>=8.0
+scikit-learn>=1.5

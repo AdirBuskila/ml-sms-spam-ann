@@ -1,0 +1,5 @@
+# Normalise line endings so Windows/macOS collaborators do not produce noisy diffs
+* text=auto eol=lf
+*.ipynb text eol=lf
+*.pdf binary
+*.png binary

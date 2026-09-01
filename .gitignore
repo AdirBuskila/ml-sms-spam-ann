@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# OS / Drive noise
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# Course material - keep local, do not publish
+docs/assignment.pdf
+
+# Editors
+.vscode/
+.idea/
